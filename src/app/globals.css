@@ -1,0 +1,531 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   The W Gym & Sauna — design tokens
+
+   The palette is built from the logo's muted blue-green. Everything sits on a
+   near-black charcoal ground; teal carries the gym, and a restrained ember
+   amber carries the sauna. The two never appear at full strength in the same
+   viewport — sections opt into the warm end of the range with `data-tone`,
+   which re-points the *accent* tokens only. Type, spacing and layout stay
+   identical, so the shift reads as a change of light rather than a change of
+   brand.
+   ========================================================================== */
+
+@theme {
+  /* --- Ground ----------------------------------------------------------- */
+  --color-ink: #07090a;
+  --color-ink-raised: #0c1011;
+  --color-ink-sunken: #040506;
+  --color-surface: #121718;
+  --color-surface-hi: #182021;
+
+  /* --- Lines ------------------------------------------------------------ */
+  --color-line: #1e2728;
+  --color-line-hi: #2b3738;
+
+  /* --- Text ------------------------------------------------------------- */
+  --color-bone: #eef2f0;
+  --color-mist: #9aa8a5;
+  --color-mist-dim: #6b7876;
+
+  /* --- Brand: muted desaturated teal ------------------------------------ */
+  --color-teal: #3f7d79;
+  --color-teal-bright: #62a8a2;
+  --color-teal-deep: #24504e;
+  --color-teal-wash: #0e1a1a;
+
+  /* --- Secondary: soft pale mint ---------------------------------------- */
+  --color-mint: #c3d8d3;
+  --color-mint-dim: #8fada7;
+
+  /* --- Sauna heat: used sparingly ---------------------------------------- */
+  --color-ember: #c2703c;
+  --color-ember-bright: #e09455;
+  --color-ember-deep: #6d3a1c;
+  --color-ember-wash: #191010;
+
+  /* --- Feedback ---------------------------------------------------------- */
+  --color-positive: #4c9c7a;
+  --color-caution: #c9a15a;
+  --color-danger: #c0584f;
+
+  /* --- Type -------------------------------------------------------------- */
+  --font-display: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Fluid editorial scale. Huge on desktop, deliberately re-tuned (not just
+     shrunk) at the small end so 320px phones never clip a headline. */
+  --text-micro: 0.6875rem;
+  --text-caption: 0.75rem;
+  --text-body-sm: 0.875rem;
+  --text-body: 1rem;
+  --text-body-lg: clamp(1.0625rem, 0.99rem + 0.36vw, 1.25rem);
+  --text-lead: clamp(1.25rem, 1.11rem + 0.7vw, 1.75rem);
+  --text-h4: clamp(1.375rem, 1.2rem + 0.85vw, 1.9rem);
+  --text-h3: clamp(1.75rem, 1.42rem + 1.6vw, 2.9rem);
+  --text-h2: clamp(2.25rem, 1.62rem + 3.1vw, 4.75rem);
+  --text-h1: clamp(2.75rem, 1.7rem + 5.2vw, 7.5rem);
+  --text-mega: clamp(3.25rem, 1.35rem + 9.5vw, 12rem);
+
+  /* --- Motion ------------------------------------------------------------ */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* --- Layout ------------------------------------------------------------ */
+  --spacing-gutter: clamp(1.25rem, 0.9rem + 1.7vw, 3.5rem);
+  --container-page: 96rem;
+}
+
+/* Accent aliases. Components reference these instead of teal/ember directly,
+   which is what lets a section change temperature without changing markup. */
+@layer base {
+  :root {
+    --accent: var(--color-teal);
+    --accent-bright: var(--color-teal-bright);
+    --accent-deep: var(--color-teal-deep);
+    --accent-wash: var(--color-teal-wash);
+    --accent-contrast: var(--color-ink);
+  }
+
+  [data-tone="warm"] {
+    --accent: var(--color-ember);
+    --accent-bright: var(--color-ember-bright);
+    --accent-deep: var(--color-ember-deep);
+    --accent-wash: var(--color-ember-wash);
+    --accent-contrast: var(--color-ink);
+  }
+
+  /* The cinematic middle ground used by the homepage transition band. */
+  [data-tone="dusk"] {
+    --accent: #8a7558;
+    --accent-bright: #a89272;
+    --accent-deep: #46402f;
+    --accent-wash: #141414;
+    --accent-contrast: var(--color-ink);
+  }
+}
+
+@theme inline {
+  --color-accent: var(--accent);
+  --color-accent-bright: var(--accent-bright);
+  --color-accent-deep: var(--accent-deep);
+  --color-accent-wash: var(--accent-wash);
+  --color-accent-contrast: var(--accent-contrast);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+    background-color: var(--color-ink);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    background-color: var(--color-ink);
+    color: var(--color-bone);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-synthesis-weight: none;
+    /* Guards against a single wide child (table, gallery rail) scrolling the
+       whole document sideways on mobile. */
+    overflow-x: clip;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Long unbreakable tokens — file paths, config constants, email addresses —
+     would otherwise push the line past the viewport on a narrow phone. This
+     only affects words that genuinely cannot fit. */
+  p,
+  li,
+  dd,
+  dt,
+  h1,
+  h2,
+  h3,
+  h4 {
+    overflow-wrap: break-word;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    overflow-wrap: anywhere;
+  }
+
+  ::selection {
+    background-color: var(--accent);
+    color: var(--color-ink);
+  }
+
+  /* A visible, high-contrast focus ring everywhere — required for the booking
+     flow to be usable by keyboard. */
+  :focus-visible {
+    outline: 2px solid var(--color-mint);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* Only suppress the ring for pointer users who did not tab here. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Prevent iOS zooming into form fields on focus. */
+  @supports (-webkit-touch-callout: none) {
+    input,
+    textarea,
+    select {
+      font-size: max(16px, 1em);
+    }
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    display: block;
+    max-width: 100%;
+  }
+
+  hr {
+    border: 0;
+    border-top: 1px solid var(--color-line);
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   Utilities
+   ========================================================================== */
+
+@layer utilities {
+  /* Page gutter that stays proportional from 320px to ultrawide, with the
+     content column capped so text never runs to absurd measures. */
+  .u-page {
+    width: 100%;
+    max-width: var(--container-page);
+    margin-inline: auto;
+    padding-inline: var(--spacing-gutter);
+  }
+
+  .u-measure {
+    max-width: 62ch;
+  }
+
+  .u-measure-tight {
+    max-width: 46ch;
+  }
+
+  /* Fine film grain over dark ground. Pure CSS so it costs no request and no
+     layout work; pointer-events are off so it never eats a click. */
+  .u-grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    z-index: 1;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
+    mix-blend-mode: overlay;
+  }
+
+  .u-hairline {
+    border-color: color-mix(in oklab, var(--color-line) 100%, transparent);
+  }
+
+  /* Screen-reader-only, but focusable (used by the skip link). */
+  .u-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .u-sr-only:focus-visible {
+    position: fixed;
+    width: auto;
+    height: auto;
+    margin: 0;
+    clip-path: none;
+    white-space: normal;
+  }
+
+  /* Full viewport height that accounts for mobile browser chrome. The dvh
+     fallback order matters: older Safari takes the first, modern takes the
+     last. */
+  .u-vh {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .u-vh-fixed {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* Comfortable touch target floor (WCAG 2.5.8 / Apple HIG). */
+  .u-tap {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .u-no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .u-no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Horizontal rails (mobile date picker, facilities gallery) that snap and
+     bleed to the screen edge without breaking the page gutter. */
+  .u-rail {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .u-rail > * {
+    scroll-snap-align: start;
+    flex: none;
+  }
+
+  .u-bleed {
+    margin-inline: calc(var(--spacing-gutter) * -1);
+    padding-inline: var(--spacing-gutter);
+  }
+
+  /* Editorial numerals for prices, times and stats. */
+  .u-tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  .u-eyebrow {
+    font-size: var(--text-caption);
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    font-weight: 500;
+    color: var(--color-mist);
+  }
+}
+
+/* ==========================================================================
+   Motion primitives
+
+   Scroll reveals are driven by a single IntersectionObserver hook that flips
+   `data-reveal` from "idle" to "in". Keeping the animation in CSS means the
+   initial paint is correct with zero JS, and the reveal simply never fires if
+   JS is unavailable — content stays visible either way.
+   ========================================================================== */
+
+@layer components {
+  [data-reveal] {
+    --reveal-y: 1.75rem;
+    --reveal-delay: 0ms;
+    --reveal-duration: 900ms;
+  }
+
+  [data-reveal="idle"] {
+    opacity: 0;
+    transform: translate3d(0, var(--reveal-y), 0);
+  }
+
+  [data-reveal="in"] {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity var(--reveal-duration) var(--ease-out-expo) var(--reveal-delay),
+      transform var(--reveal-duration) var(--ease-out-expo) var(--reveal-delay);
+  }
+
+  /* Line-by-line text mask reveal. Each line is wrapped in a clipping span so
+     the glyphs rise out of an invisible edge rather than fading in place. */
+  .c-mask-line {
+    display: block;
+    overflow: hidden;
+    padding-block: 0.06em;
+    margin-block: -0.06em;
+  }
+
+  .c-mask-line > span {
+    display: block;
+    transform: translate3d(0, 105%, 0);
+    transition: transform 1100ms var(--ease-out-expo) var(--reveal-delay);
+    will-change: transform;
+  }
+
+  [data-reveal="in"] .c-mask-line > span,
+  .c-mask-line[data-reveal="in"] > span {
+    transform: none;
+  }
+
+  /* Entrance animations for above-the-fold content, which must not wait on an
+     IntersectionObserver callback — the hero is already in view on load. */
+  .c-rise > span,
+  .c-rise-item {
+    animation: c-rise 1150ms var(--ease-out-expo) var(--reveal-delay, 0ms) both;
+  }
+
+  .c-fade-up {
+    animation: c-fade-up 1000ms var(--ease-out-expo) var(--reveal-delay, 0ms) both;
+  }
+
+  @keyframes c-rise {
+    from {
+      transform: translate3d(0, 105%, 0);
+    }
+    to {
+      transform: none;
+    }
+  }
+
+  /* Very slow ambient drift for the non-WebGL hero backdrop. */
+  .c-drift-cool {
+    animation: c-drift-cool 26s ease-in-out infinite alternate;
+  }
+
+  .c-drift-warm {
+    animation: c-drift-warm 32s ease-in-out infinite alternate;
+  }
+
+  @keyframes c-drift-cool {
+    from {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    to {
+      transform: translate3d(6%, 4%, 0) scale(1.12);
+    }
+  }
+
+  @keyframes c-drift-warm {
+    from {
+      transform: translate3d(0, 0, 0) scale(1.05);
+    }
+    to {
+      transform: translate3d(-5%, -6%, 0) scale(1);
+    }
+  }
+
+  @keyframes c-fade-up {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 1.25rem, 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Image reveals slide a cover away and settle a slight scale on the image,
+     which reads more like a camera move than a fade. */
+  .c-image-reveal {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .c-image-reveal > img,
+  .c-image-reveal [data-reveal-target] {
+    transform: scale(1.12);
+    transition: transform 1600ms var(--ease-out-expo) var(--reveal-delay);
+    will-change: transform;
+  }
+
+  .c-image-reveal[data-reveal="in"] > img,
+  .c-image-reveal[data-reveal="in"] [data-reveal-target] {
+    transform: scale(1);
+  }
+}
+
+/* Respect the user's motion preference across every primitive at once. */
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal="idle"] {
+    opacity: 1;
+    transform: none;
+  }
+
+  .c-mask-line > span {
+    transform: none;
+    transition: none;
+  }
+
+  .c-rise > span,
+  .c-rise-item,
+  .c-fade-up {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .c-image-reveal > img,
+  .c-image-reveal [data-reveal-target] {
+    transform: none;
+    transition: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

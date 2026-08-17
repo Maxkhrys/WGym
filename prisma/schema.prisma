@@ -1,0 +1,534 @@
+// The W Gym & Sauna — data model
+// Business timezone is Europe/Dublin. ALL timestamps are stored in UTC.
+// Wall-clock opening hours live in AvailabilityRule as minute offsets and are
+// resolved against Europe/Dublin at query time (see src/lib/booking/time.ts),
+// which keeps availability correct across DST transitions.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  OWNER
+  ADMIN
+  STAFF
+  MEMBER
+}
+
+enum BillingInterval {
+  MONTH
+  YEAR
+  ONE_TIME
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentKind {
+  MEMBERSHIP
+  MEMBERSHIP_JOINING_FEE
+  DAY_PASS
+  BOOKING
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum DiscountScope {
+  MEMBERSHIP
+  BOOKING
+  ALL
+}
+
+enum TermsDocument {
+  MEMBERSHIP_TERMS
+  PRIVACY_POLICY
+  CANCELLATION_POLICY
+  HEALTH_DECLARATION
+}
+
+enum AnnouncementLevel {
+  INFO
+  IMPORTANT
+  CLOSURE
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js core models
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+
+  phone       String?
+  dateOfBirth DateTime? @db.Date
+
+  role Role @default(MEMBER)
+
+  /// Short human-readable code rendered as the member QR payload.
+  memberCode String? @unique
+
+  /// Marketing consent is deliberately separate from terms acceptance so it can
+  /// never be bundled into a required signup checkbox (GDPR).
+  marketingOptIn   Boolean   @default(false)
+  marketingOptInAt DateTime?
+
+  stripeCustomerId String? @unique
+
+  accounts         Account[]
+  sessions         Session[]
+  memberships      Membership[]
+  bookings         Booking[]
+  payments         Payment[]
+  emergencyContact EmergencyContact?
+  termsAcceptances TermsAcceptance[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([createdAt])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Memberships
+// ---------------------------------------------------------------------------
+
+model MembershipPlan {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  /// Short marketing line shown on the plan card.
+  tagline     String?
+  description String
+
+  /// Minor units (cents). Never read a price from the client — always resolve
+  /// the amount from this row server-side before creating a Stripe session.
+  priceCents      Int
+  currency        String          @default("eur")
+  interval        BillingInterval @default(MONTH)
+  joiningFeeCents Int             @default(0)
+
+  features           String[]
+  minimumTermMonths  Int          @default(0)
+  cancellationNotice String?
+  cancellationPolicy String?
+
+  /// One-time passes skip the subscription path and use a single payment.
+  isDayPass Boolean @default(false)
+
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  stripeProductId String?
+  stripePriceId   String?
+
+  memberships Membership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, sortOrder])
+}
+
+model Membership {
+  id     String @id @default(cuid())
+  userId String
+  planId String
+
+  status MembershipStatus @default(PENDING)
+
+  startDate        DateTime?
+  endDate          DateTime?
+  currentPeriodEnd DateTime?
+  cancelAtPeriodEnd Boolean  @default(false)
+  cancelledAt      DateTime?
+
+  stripeSubscriptionId    String? @unique
+  stripeCheckoutSessionId String? @unique
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     MembershipPlan @relation(fields: [planId], references: [id])
+  payments Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([status])
+  @@index([currentPeriodEnd])
+}
+
+// ---------------------------------------------------------------------------
+// Sauna & recovery booking
+// ---------------------------------------------------------------------------
+
+model SaunaService {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  tagline     String?
+  description String
+
+  durationMinutes Int
+  /// Cleaning / turnaround time appended after each booking. Slots are spaced
+  /// by duration + buffer.
+  bufferMinutes   Int @default(0)
+
+  priceCents Int
+  currency   String @default("eur")
+
+  /// How many guests can occupy the same slot in total.
+  capacity            Int @default(1)
+  /// Upper bound a single booking may claim from that capacity.
+  maxGuestsPerBooking Int @default(1)
+
+  /// Booking window guards.
+  minNoticeMinutes Int @default(120)
+  maxAdvanceDays   Int @default(60)
+
+  /// A private hire takes the whole room regardless of guest count.
+  isExclusive Boolean @default(false)
+
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  stripePriceId String?
+
+  availabilityRules AvailabilityRule[]
+  blockedTimes      BlockedTime[]
+  bookings          Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, sortOrder])
+}
+
+/// Recurring weekly opening hours. Times are Europe/Dublin wall-clock minutes
+/// from midnight (e.g. 06:30 => 390), NOT UTC offsets, so DST is handled when
+/// the rule is projected onto a concrete date.
+model AvailabilityRule {
+  id String @id @default(cuid())
+
+  /// Null applies the rule to every service (house opening hours).
+  serviceId String?
+
+  /// 0 = Sunday ... 6 = Saturday, matching JS getDay().
+  dayOfWeek   Int
+  startMinute Int
+  endMinute   Int
+
+  active Boolean @default(true)
+
+  service SaunaService? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([serviceId, dayOfWeek, active])
+}
+
+/// Holidays, maintenance and one-off closures. Stored as absolute UTC instants.
+model BlockedTime {
+  id String @id @default(cuid())
+
+  /// Null blocks every service.
+  serviceId String?
+
+  startsAt DateTime
+  endsAt   DateTime
+  reason   String?
+
+  service SaunaService? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([startsAt, endsAt])
+  @@index([serviceId, startsAt])
+}
+
+model Booking {
+  id String @id @default(cuid())
+
+  /// Short code shown to the customer and used on the door.
+  reference String @unique
+
+  /// Null for guest bookings.
+  userId    String?
+  serviceId String
+
+  /// Captured for guests, and denormalised for members so the booking record
+  /// survives a later profile edit.
+  customerName  String
+  customerEmail String
+  customerPhone String?
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  guestCount Int @default(1)
+
+  amountCents Int
+  currency    String @default("eur")
+
+  status BookingStatus @default(PENDING)
+
+  /// A PENDING booking holds capacity until this instant. The sweeper in
+  /// src/lib/booking/holds.ts expires anything past it, so abandoned checkouts
+  /// release their slot.
+  holdExpiresAt DateTime?
+
+  stripeCheckoutSessionId String? @unique
+  stripePaymentIntentId   String?
+
+  cancelledAt        DateTime?
+  cancellationReason String?
+  attendedAt         DateTime?
+
+  /// Set when staff create or move a booking from the admin calendar.
+  createdByAdmin Boolean @default(false)
+  notes          String?
+
+  discountCodeId String?
+  discountCents  Int    @default(0)
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  service      SaunaService  @relation(fields: [serviceId], references: [id])
+  payments     Payment[]
+  discountCode DiscountCode? @relation(fields: [discountCodeId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Availability lookups scan a service across a date range and only count
+  // capacity-consuming rows, so these two carry the booking engine.
+  @@index([serviceId, startsAt, status])
+  @@index([status, holdExpiresAt])
+  @@index([userId, startsAt])
+  @@index([startsAt])
+}
+
+// ---------------------------------------------------------------------------
+// Payments & discounts
+// ---------------------------------------------------------------------------
+
+model Payment {
+  id String @id @default(cuid())
+
+  userId       String?
+  membershipId String?
+  bookingId    String?
+
+  kind   PaymentKind
+  status PaymentStatus @default(PENDING)
+
+  amountCents Int
+  currency    String @default("eur")
+  description String?
+
+  stripePaymentIntentId   String? @unique
+  stripeInvoiceId         String?
+  stripeCheckoutSessionId String?
+
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  membership Membership? @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  booking    Booking?    @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
+
+model DiscountCode {
+  id   String @id @default(cuid())
+  code String @unique
+
+  type  DiscountType
+  /// Percent (1-100) or minor units depending on `type`.
+  value Int
+  scope DiscountScope @default(ALL)
+
+  maxRedemptions Int?
+  timesRedeemed  Int  @default(0)
+
+  startsAt  DateTime?
+  expiresAt DateTime?
+  active    Boolean   @default(true)
+
+  stripeCouponId        String?
+  stripePromotionCodeId String?
+
+  bookings Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// People & compliance
+// ---------------------------------------------------------------------------
+
+model Trainer {
+  id      String @id @default(cuid())
+  slug    String @unique
+  name    String
+  role    String
+  bio     String
+
+  qualifications String[]
+  specialties    String[]
+
+  imageUrl     String?
+  instagramUrl String?
+  email        String?
+
+  isFounder Boolean @default(false)
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, sortOrder])
+}
+
+model EmergencyContact {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  name         String
+  relationship String?
+  phone        String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Immutable audit trail: which document version a user accepted and when.
+model TermsAcceptance {
+  id     String @id @default(cuid())
+  userId String
+
+  document  TermsDocument
+  version   String
+  acceptedAt DateTime     @default(now())
+  ipAddress String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, document])
+}
+
+// ---------------------------------------------------------------------------
+// Editable site configuration
+// ---------------------------------------------------------------------------
+
+/// Key/value store for the handful of things staff must be able to change
+/// without a deploy: contact details, social links, opening-hours copy.
+/// Marketing prose deliberately stays in code. A CMS can later back this same
+/// interface (see src/lib/settings.ts) without touching callers.
+model SiteSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model Announcement {
+  id    String            @id @default(cuid())
+  title String
+  body  String
+  level AnnouncementLevel @default(INFO)
+
+  active   Boolean   @default(true)
+  startsAt DateTime?
+  endsAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, startsAt, endsAt])
+}
