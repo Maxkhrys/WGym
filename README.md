@@ -39,7 +39,7 @@ Sign in once at `/signin` with the address in `SEED_OWNER_EMAIL`, then re-run
 ## Checks
 
 ```bash
-npm run check              # typecheck + lint + timezone assertions
+npm run check              # typecheck + lint + timezone + site-URL assertions
 npm run check:db           # concurrency + double-booking (needs the database)
 npm run check:routes       # every route responds correctly (needs the server)
 npm run check:guards       # role-based access control (needs the server)
@@ -135,9 +135,16 @@ Everything unknown is a visible placeholder rather than invented data.
 ## Deploying
 
 1. Provision PostgreSQL (Neon, Supabase, Prisma Postgres…).
-2. Set every variable in `.env.example`. `DATABASE_POOL_MAX` must leave room
-   for the pool *times the number of build workers* under the provider's
-   connection limit.
+2. Set every variable in `.env.example`.
+   - **`DATABASE_URL` must be set at build time**, not just at runtime. The
+     marketing pages are statically prerendered and read plans, services and
+     trainers from the database, so the build needs to reach it.
+   - `DATABASE_POOL_MAX` must leave room for the pool *times the number of
+     build workers* under the provider's connection limit.
+   - `NEXT_PUBLIC_SITE_URL` must be a full origin (`https://thewgym.ie`).
+     Leaving it blank falls back to the deployment's own domain rather than
+     failing the build, but canonical URLs and emailed links will point at the
+     Vercel domain until you set it.
 3. `npm run db:deploy && npm run db:seed`
 4. Point a Stripe webhook at `/api/stripe/webhook` for
    `checkout.session.completed`, `checkout.session.expired`, `invoice.paid`,

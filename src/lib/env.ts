@@ -1,5 +1,7 @@
 import "server-only";
 
+import { SITE_URL, absoluteUrl } from "@/lib/site-url";
+
 /**
  * Third-party integrations are optional at runtime. When a key is absent the
  * corresponding module degrades to a safe stub (emails log to the console,
@@ -14,7 +16,7 @@ function optional(name: string): string | undefined {
 }
 
 export const env = {
-  siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  siteUrl: SITE_URL,
 
   stripeSecretKey: optional("STRIPE_SECRET_KEY"),
   stripeWebhookSecret: optional("STRIPE_WEBHOOK_SECRET"),
@@ -29,8 +31,6 @@ export const env = {
 export const isStripeConfigured = Boolean(env.stripeSecretKey);
 export const isEmailConfigured = Boolean(env.resendApiKey);
 
-/** Absolute URL helper — Stripe redirects and emails must not use relative paths. */
-export function absoluteUrl(path: string): string {
-  const base = env.siteUrl.replace(/\/$/, "");
-  return path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
-}
+// Re-exported so existing server-side callers keep a single import, while the
+// implementation lives in site-url.ts alongside the origin it depends on.
+export { absoluteUrl };

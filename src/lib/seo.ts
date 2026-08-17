@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { openingHours, siteConfig, WEEKDAY_ORDER } from "@/config/site";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+import { SITE_URL } from "@/lib/site-url";
 
 /**
  * Builds page metadata from a short description of the page. Titles are

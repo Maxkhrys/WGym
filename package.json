@@ -15,12 +15,13 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "check:tz": "tsx scripts/check-timezone.ts",
+    "check:url": "tsx scripts/check-site-url.ts",
     "check:booking": "tsx --conditions=react-server scripts/check-double-booking.ts",
     "check:concurrency": "tsx --conditions=react-server scripts/check-concurrency.ts",
     "check:routes": "node scripts/check-routes.mjs",
     "check:guards": "tsx --conditions=react-server scripts/check-auth-guards.ts",
     "check:webhook": "tsx --conditions=react-server scripts/check-stripe-webhook.ts",
-    "check": "npm run typecheck && npm run lint && npm run check:tz",
+    "check": "npm run typecheck && npm run lint && npm run check:tz && npm run check:url",
     "check:db": "npm run check:concurrency && npm run check:booking"
   },
   "dependencies": {
