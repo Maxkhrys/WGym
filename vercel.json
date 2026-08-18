@@ -1,3 +1,0 @@
-{
-  "buildCommand": "npm run db:deploy && npm run db:seed && npm run build"
-}
